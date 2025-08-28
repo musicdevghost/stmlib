@@ -48,7 +48,6 @@ inline float Interpolate(const float* table, float index, float size) {
   return a + (b - a) * index_fractional;
 }
 
-
 inline float InterpolateHermite(const float* table, float index, float size) {
   index *= size;
   MAKE_INTEGRAL_FRACTIONAL(index)
@@ -72,10 +71,6 @@ inline float InterpolateWrap(const float* table, float index, float size) {
   float a = table[index_integral];
   float b = table[index_integral + 1];
   return a + (b - a) * index_fractional;
-}
-
-inline float SmoothStep(float value) {
-  return value * value * (3.0f - 2.0f * value);
 }
 
 #define ONE_POLE(out, in, coefficient) out += (coefficient) * ((in) - out);
@@ -113,6 +108,7 @@ inline float SoftClip(float x) {
 }
 
 #ifdef TEST
+
   inline int32_t Clip16(int32_t x) {
     if (x < -32768) {
       return -32768;
@@ -122,6 +118,7 @@ inline float SoftClip(float x) {
       return x;
     }
   }
+
   inline uint16_t ClipU16(int32_t x) {
     if (x < 0) {
       return 0;
@@ -131,30 +128,56 @@ inline float SoftClip(float x) {
       return x;
     }
   }
-#else
-  inline int32_t Clip16(int32_t x) {
-    int32_t result;
-    __asm ("ssat %0, %1, %2" : "=r" (result) :  "I" (16), "r" (x) );
-    return result;
-  }
-  inline uint32_t ClipU16(int32_t x) {
-    uint32_t result;
-    __asm ("usat %0, %1, %2" : "=r" (result) :  "I" (16), "r" (x) );
-    return result;
-  }
-#endif
-  
-#ifdef TEST
+
   inline float Sqrt(float x) {
     return sqrtf(x);
   }
-#else
-  inline float Sqrt(float x) {
-    float result;
-    __asm ("vsqrt.f32 %0, %1" : "=w" (result) : "w" (x) );
-    return result;
-  }
-#endif
+
+#else  // not TEST
+
+  // ---------------------------------------------------------------------------
+  // Portable fallbacks for non-ARM builds
+  // ---------------------------------------------------------------------------
+  #if !defined(__arm__) && !defined(__aarch64__)
+
+    inline int32_t Clip16(int32_t x) {
+      if (x < -32768) return -32768;
+      if (x > 32767)  return 32767;
+      return x;
+    }
+
+    inline uint32_t ClipU16(int32_t x) {
+      if (x < 0)      return 0;
+      if (x > 65535)  return 65535;
+      return x;
+    }
+
+    inline float Sqrt(float x) {
+      return std::sqrt(x);
+    }
+
+  #else
+    // --- Original ARM NEON asm versions ---
+    inline int32_t Clip16(int32_t x) {
+      int32_t result;
+      __asm ("ssat %0, %1, %2" : "=r" (result) :  "I" (16), "r" (x) );
+      return result;
+    }
+
+    inline uint32_t ClipU16(int32_t x) {
+      uint32_t result;
+      __asm ("usat %0, %1, %2" : "=r" (result) :  "I" (16), "r" (x) );
+      return result;
+    }
+
+    inline float Sqrt(float x) {
+      float result;
+      __asm ("vsqrt.f32 %0, %1" : "=w" (result) : "w" (x) );
+      return result;
+    }
+  #endif  // ARM / non-ARM
+
+#endif    // TEST
 
 inline int16_t SoftConvert(float x) {
   return Clip16(static_cast<int32_t>(SoftLimit(x * 0.5f) * 32768.0f));
